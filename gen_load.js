@@ -34,7 +34,7 @@ if (args.h) {
 function genAssertion(cert, secretKey) {
   // XXX: expiration date should really be based on current server time.
   var expirationDate = new Date(new Date().getTime() + (2 * 60 * 1000));
-  var tok = new jwt.JWT(null, expirationDate, args.d);
+  var tok = new jwt.JWT(null, expirationDate, "http://" + args.d);
   var assertion = vep.bundleCertsAndAssertion([cert], tok.sign(secretKey));
 
   return {
@@ -100,7 +100,9 @@ wcli.post(cfg, '/wsapi/authenticate_user', ctx, {
     pubkey: keypair.publicKey.serialize()
   }, function(resp) {
     var cert = resp.body;
-    var assertion = genAssertion(cert, keypair.secretKey)
-    sendAssertion(assertion.assertion);
+    for (var i = 0; i < 10; i++) {
+      var assertion = genAssertion(cert, keypair.secretKey)
+      sendAssertion(assertion.assertion);
+    }
   });
 });
