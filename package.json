@@ -4,6 +4,7 @@
   "dependencies": {
     "optimist": "*",
     "jwcrypto": "0.1.0",
+    "node-uuid": "*",
     "urlparse": "*"
   }
 }

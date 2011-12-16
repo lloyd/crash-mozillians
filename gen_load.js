@@ -1,12 +1,8 @@
 #!/usr/bin/env node
 
-const
-http = require('http'),
-https = require('https'),
-jwk = require('jwcrypto/jwk.js'),
+const jwk = require('jwcrypto/jwk.js'),
 jwt = require('jwcrypto/jwt.js'),
 vep = require('jwcrypto/vep.js'),
-querystring = require('querystring'),
 urlparse = require('urlparse');
 
 var argv = require('optimist')
@@ -57,44 +53,9 @@ function genAssertion(cert, secretKey) {
   };
 }
 
-function sendAssertion(assertion) {
-  var body = querystring.stringify({
-    assertion: assertion,
-    mode: 'register'
-  });
-
-  var method = url.scheme === 'http' ? http : https;
-
-  var req = method.request({
-    host: url.host,
-    path: '/en-US/browserid-login',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Content-Length': body.length
-    },
-    method: "POST",
-    agent: false
-  }, function(res) {
-    console.log('CODE:', res.statusCode);
-    console.log('location:', res.headers['location']);
-    var body = "";
-    res.on('data', function(chunk) {
-      body += chunk;
-    });
-    res.on('end', function() {
-      console.log(body);
-    });
-  }).on('error', function(e) {
-    console.log("Got error: " + e.message);
-    process.exit(1);
-  });
-
-  req.write(body);
-  req.end();
-}
-
 const
-wcli = require("./lib/wsapi_client.js");
+wcli = require("./lib/wsapi_client.js"),
+mozcli = require("./lib/mozillians_client.js");
 
 var args = argv.argv;
 
@@ -116,8 +77,8 @@ wcli.post(cfg, '/wsapi/authenticate_user', ctx, {
   }, function(resp) {
     var cert = resp.body;
     for (var i = 0; i < args.i; i++) {
-      var assertion = genAssertion(cert, keypair.secretKey)
-      sendAssertion(assertion.assertion);
+      var assertion = genAssertion(cert, keypair.secretKey);
+      mozcli.login(assertion.assertion, url);
     }
   });
 });
