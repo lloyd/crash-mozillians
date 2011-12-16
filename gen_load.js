@@ -2,10 +2,12 @@
 
 const
 http = require('http'),
+https = require('https'),
 jwk = require('jwcrypto/jwk.js'),
 jwt = require('jwcrypto/jwt.js'),
 vep = require('jwcrypto/vep.js'),
-querystring = require('querystring');
+querystring = require('querystring'),
+urlparse = require('urlparse');
 
 var argv = require('optimist')
 .usage('Get an assertion and bounce it off of mozillians\nUsage: $0')
@@ -16,9 +18,13 @@ var argv = require('optimist')
 .default('s', 'https://browserid.org')
 .alias('d', 'domain')
 .describe('d', 'domain that assertion is generated for')
-.default('d', "50-57-227-85.static.cloud-ips.com")
+.default('d', "http://50-57-227-85.static.cloud-ips.com")
 .alias('e', 'email')
 .describe('e', 'email address to use')
+.demand('e')
+.alias('i', 'iterations')
+.describe('i', 'the number of distinct assertions to bounce off the server')
+.default('i', 10)
 .demand('e')
 .alias('p', 'password')
 .describe('p', 'password')
@@ -31,10 +37,17 @@ if (args.h) {
   process.exit(0);
 }
 
+try {
+  var url = urlparse(args.d).originOnly();
+} catch(e) {
+  process.stderr.write("Invalid url: " + e.toString() + "\n");
+  pocess.exit(1);
+}
+
 function genAssertion(cert, secretKey) {
   // XXX: expiration date should really be based on current server time.
   var expirationDate = new Date(new Date().getTime() + (2 * 60 * 1000));
-  var tok = new jwt.JWT(null, expirationDate, "http://" + args.d);
+  var tok = new jwt.JWT(null, expirationDate, args.d);
   var assertion = vep.bundleCertsAndAssertion([cert], tok.sign(secretKey));
 
   return {
@@ -50,8 +63,10 @@ function sendAssertion(assertion) {
     mode: 'register'
   });
 
-  var req = http.request({
-    host: args.d,
+  var method = url.scheme === 'http' ? http : https;
+
+  var req = method.request({
+    host: url.host,
     path: '/en-US/browserid-login',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -100,7 +115,7 @@ wcli.post(cfg, '/wsapi/authenticate_user', ctx, {
     pubkey: keypair.publicKey.serialize()
   }, function(resp) {
     var cert = resp.body;
-    for (var i = 0; i < 10; i++) {
+    for (var i = 0; i < args.i; i++) {
       var assertion = genAssertion(cert, keypair.secretKey)
       sendAssertion(assertion.assertion);
     }
